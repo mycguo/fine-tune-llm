@@ -7,7 +7,8 @@ streamlit==1.31.1
 tensorboard==2.14.1
 accelerate==0.27.2
 bitsandbytes==0.42.0
-sentencepiece==0.1.99
+--find-links https://download.pytorch.org/whl/torch_stable.html
+--extra-index-url https://download.pytorch.org/whl/cpu
 protobuf>=3.20.0,<4.24.0
 huggingface-hub==0.20.3
 safetensors==0.4.1
