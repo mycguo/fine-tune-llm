@@ -2,7 +2,11 @@
 import os
 import torch
 import streamlit as st
+import warnings
 from datasets import load_dataset
+
+# Suppress invalid escape sequence warnings
+warnings.filterwarnings("ignore", category=SyntaxWarning, module="peft")
 
 # Handle imports with error checking
 try:
