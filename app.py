@@ -3,17 +3,27 @@ import os
 import torch
 import streamlit as st
 from datasets import load_dataset
-from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    BitsAndBytesConfig,
-    HfArgumentParser,
-    TrainingArguments,
-    pipeline,
-    logging,
-)
-from peft import LoraConfig, PeftModel
-from trl import SFTTrainer
+
+# Handle imports with error checking
+try:
+    from transformers import (
+        AutoModelForCausalLM,
+        AutoTokenizer,
+        TrainingArguments,
+        pipeline,
+        logging,
+    )
+    from peft import LoraConfig, PeftModel
+    from trl import SFTTrainer
+except ImportError as e:
+    st.error(f"""
+    Error importing required packages. Please install them using:
+    ```
+    pip install transformers peft trl
+    ```
+    Error details: {str(e)}
+    """)
+    st.stop()
 
 st.set_page_config(page_title="LLM Fine-tuning", layout="wide")
 
