@@ -8,10 +8,9 @@ from datasets import load_dataset
 # Suppress invalid escape sequence warnings
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="peft")
 
-# Set memory management for MPS
-if torch.backends.mps.is_available():
-    os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.0'
-    torch.mps.empty_cache()
+# Force CPU usage
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
+torch.set_num_threads(4)  # Limit CPU threads
 
 # Handle imports with error checking
 try:
@@ -39,7 +38,7 @@ st.set_page_config(page_title="LLM Fine-tuning", layout="wide")
 st.title("LLM Fine-tuning Interface")
 
 # Model and dataset configuration
-model_name = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"  # Changed to a smaller model
+model_name = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 dataset_name = "mlabonne/guanaco-llama2-1k"
 new_model = "tinyllama-finetune"
 
@@ -51,34 +50,22 @@ with st.sidebar:
     lora_dropout = st.slider("LoRA dropout", 0.0, 0.5, 0.1)
     num_train_epochs = st.slider("Number of epochs", 1, 10, 1)
     learning_rate = st.number_input("Learning rate", 1e-5, 1e-3, 2e-4, format="%.2e")
-    batch_size = st.slider("Batch size", 1, 2, 1)  # Further reduced batch size
-    gradient_accumulation_steps = st.slider("Gradient accumulation steps", 1, 32, 8)  # Increased default
+    batch_size = st.slider("Batch size", 1, 2, 1)
+    gradient_accumulation_steps = st.slider("Gradient accumulation steps", 1, 32, 8)
 
 def initialize_model():
-    # Check if MPS is available
-    if torch.backends.mps.is_available():
-        device = torch.device("mps")
-        st.info("Using MPS device")
-        compute_dtype = torch.float16
-        # Enable memory efficient attention
-        os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:256"  # Reduced from 512
-    elif torch.cuda.is_available():
-        device = torch.device("cuda")
-        st.info("Using CUDA device")
-        compute_dtype = torch.float16
-    else:
-        device = torch.device("cpu")
-        st.info("Using CPU device")
-        compute_dtype = torch.float32
+    device = torch.device("cpu")
+    st.info("Using CPU device")
+    compute_dtype = torch.float32
 
     # Load base model with memory optimizations
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=compute_dtype,
-        device_map="auto",
+        device_map="cpu",
         low_cpu_mem_usage=True,
-        max_memory={0: "4GiB"},  # Limit memory usage
-        offload_folder="offload"  # Enable offloading
+        max_memory={0: "2GiB"},  # Reduced memory limit
+        offload_folder="offload"
     )
     model.config.use_cache = False
     model.config.pretraining_tp = 1
@@ -98,7 +85,7 @@ def train_model():
     with st.spinner("Loading dataset..."):
         dataset = load_dataset(dataset_name, split="train")
         # Limit dataset size for testing
-        dataset = dataset.select(range(min(100, len(dataset))))
+        dataset = dataset.select(range(min(50, len(dataset))))  # Further reduced dataset size
         st.info(f"Dataset loaded with {len(dataset)} examples")
 
     # Configure LoRA
@@ -128,7 +115,9 @@ def train_model():
         warmup_ratio=0.03,
         group_by_length=True,
         lr_scheduler_type="cosine",
-        report_to="tensorboard"
+        report_to="tensorboard",
+        no_cuda=True,  # Force CPU usage
+        use_cpu=True   # Force CPU usage
     )
 
     # Initialize trainer
