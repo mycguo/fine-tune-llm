@@ -37,7 +37,7 @@ new_model = "Llama-2-7b-chat-finetune"
 # Training parameters
 with st.sidebar:
     st.header("Training Parameters")
-    lora_r = st.slider("LoRA attention dimension", 8, 128, 64)
+    lora_r = st.slider("LoRA attention dimension", 8, 16, 8)
     lora_alpha = st.slider("LoRA alpha", 8, 32, 16)
     lora_dropout = st.slider("LoRA dropout", 0.0, 0.5, 0.1)
     num_train_epochs = st.slider("Number of epochs", 1, 10, 1)
