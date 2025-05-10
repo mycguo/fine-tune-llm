@@ -39,9 +39,9 @@ st.set_page_config(page_title="LLM Fine-tuning", layout="wide")
 st.title("LLM Fine-tuning Interface")
 
 # Model and dataset configuration
-model_name = "NousResearch/Llama-2-7b-chat-hf"
+model_name = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"  # Changed to a smaller model
 dataset_name = "mlabonne/guanaco-llama2-1k"
-new_model = "Llama-2-7b-chat-finetune"
+new_model = "tinyllama-finetune"
 
 # Training parameters
 with st.sidebar:
@@ -51,8 +51,8 @@ with st.sidebar:
     lora_dropout = st.slider("LoRA dropout", 0.0, 0.5, 0.1)
     num_train_epochs = st.slider("Number of epochs", 1, 10, 1)
     learning_rate = st.number_input("Learning rate", 1e-5, 1e-3, 2e-4, format="%.2e")
-    batch_size = st.slider("Batch size", 1, 4, 1)  # Reduced max batch size
-    gradient_accumulation_steps = st.slider("Gradient accumulation steps", 1, 16, 4)
+    batch_size = st.slider("Batch size", 1, 2, 1)  # Further reduced batch size
+    gradient_accumulation_steps = st.slider("Gradient accumulation steps", 1, 32, 8)  # Increased default
 
 def initialize_model():
     # Check if MPS is available
@@ -61,7 +61,7 @@ def initialize_model():
         st.info("Using MPS device")
         compute_dtype = torch.float16
         # Enable memory efficient attention
-        os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
+        os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:256"  # Reduced from 512
     elif torch.cuda.is_available():
         device = torch.device("cuda")
         st.info("Using CUDA device")
@@ -76,7 +76,9 @@ def initialize_model():
         model_name,
         torch_dtype=compute_dtype,
         device_map="auto",
-        low_cpu_mem_usage=True
+        low_cpu_mem_usage=True,
+        max_memory={0: "4GiB"},  # Limit memory usage
+        offload_folder="offload"  # Enable offloading
     )
     model.config.use_cache = False
     model.config.pretraining_tp = 1
@@ -95,6 +97,8 @@ def train_model():
     # Load dataset
     with st.spinner("Loading dataset..."):
         dataset = load_dataset(dataset_name, split="train")
+        # Limit dataset size for testing
+        dataset = dataset.select(range(min(100, len(dataset))))
         st.info(f"Dataset loaded with {len(dataset)} examples")
 
     # Configure LoRA
