@@ -8,6 +8,11 @@ from datasets import load_dataset
 # Suppress invalid escape sequence warnings
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="peft")
 
+# Set memory management for MPS
+if torch.backends.mps.is_available():
+    os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.0'
+    torch.mps.empty_cache()
+
 # Handle imports with error checking
 try:
     from transformers import (
@@ -46,7 +51,8 @@ with st.sidebar:
     lora_dropout = st.slider("LoRA dropout", 0.0, 0.5, 0.1)
     num_train_epochs = st.slider("Number of epochs", 1, 10, 1)
     learning_rate = st.number_input("Learning rate", 1e-5, 1e-3, 2e-4, format="%.2e")
-    batch_size = st.slider("Batch size", 1, 8, 4)
+    batch_size = st.slider("Batch size", 1, 4, 1)  # Reduced max batch size
+    gradient_accumulation_steps = st.slider("Gradient accumulation steps", 1, 16, 4)
 
 def initialize_model():
     # Check if MPS is available
@@ -54,6 +60,8 @@ def initialize_model():
         device = torch.device("mps")
         st.info("Using MPS device")
         compute_dtype = torch.float16
+        # Enable memory efficient attention
+        os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
     elif torch.cuda.is_available():
         device = torch.device("cuda")
         st.info("Using CUDA device")
@@ -63,11 +71,12 @@ def initialize_model():
         st.info("Using CPU device")
         compute_dtype = torch.float32
 
-    # Load base model
+    # Load base model with memory optimizations
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=compute_dtype,
-        device_map="auto"
+        device_map="auto",
+        low_cpu_mem_usage=True
     )
     model.config.use_cache = False
     model.config.pretraining_tp = 1
@@ -102,8 +111,8 @@ def train_model():
         output_dir="./results",
         num_train_epochs=num_train_epochs,
         per_device_train_batch_size=batch_size,
-        gradient_accumulation_steps=1,
-        optim="paged_adamw_32bit",
+        gradient_accumulation_steps=gradient_accumulation_steps,
+        optim="adamw_torch",
         save_steps=0,
         logging_steps=25,
         learning_rate=learning_rate,
